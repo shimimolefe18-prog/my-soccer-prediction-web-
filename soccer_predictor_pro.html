@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soccer Predictor Pro - Dixon-Coles & EV Analytics</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f32',
+                            900: '#0f172a',
+                            950: '#080d1a',
+                        },
+                        brand: {
+                            blue: '#3b82f6',
+                            green: '#10b981',
+                            purple: '#8b5cf6',
+                            gold: '#f59e0b',
+                            red: '#ef4444'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar for probability matrix */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen antialiased flex flex-col justify-between">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-futbol text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide text-white">SoccerPredictor<span class="text-blue-500">PRO</span></h1>
+                    <p class="text-xs text-slate-400">Dixon-Coles Model & +EV Value Engine</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 text-xs font-medium">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> Dixon-Coles Active
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-grow">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT COLUMN: Match Configuration & Inputs -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center">
+                        <i class="fa-solid fa-sliders text-blue-400 mr-2"></i> Match Parameters
+                    </h2>
+
+                    <!-- League Selection -->
+                    <div class="mb-4">
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">League & Dataset</label>
+                        <select id="leagueSelect" onchange="onLeagueChange()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                            <option value="epl">Premier League (England)</option>
+                            <option value="laliga">La Liga (Spain)</option>
+                            <option value="seriea">Serie A (Italy)</option>
+                            <option value="bundesliga">Bundesliga (Germany)</option>
+                            <option value="ligue1">Ligue 1 (France)</option>
+                            <option value="custom">Custom Teams / Manual Strength</option>
+                        </select>
+                    </div>
+
+                    <!-- Teams Selection Grid -->
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1.5">Home Team</label>
+                            <select id="homeSelect" onchange="onTeamChange()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1.5">Away Team</label>
+                            <select id="awaySelect" onchange="onTeamChange()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Advanced Strength & Modifiers -->
+                    <div class="border-t border-slate-800 pt-4 mt-4">
+                        <div class="flex items-center justify-between cursor-pointer py-1" onclick="toggleAdvancedSettings()">
+                            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center">
+                                <i class="fa-solid fa-microchip text-indigo-400 mr-1.5"></i> Attack / Defence Ratings & Modifiers
+                            </span>
+                            <i id="advChevron" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
+                        </div>
+
+                        <div id="advancedSettings" class="space-y-4 pt-3 hidden">
+                            <!-- Ratings Inputs -->
+                            <div class="grid grid-cols-2 gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                                <div class="space-y-2">
+                                    <span class="text-[11px] font-semibold text-blue-400 block border-b border-slate-800 pb-1">Home Team Base</span>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block">Attacking Strength</label>
+                                        <input type="number" id="hAtt" step="0.05" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white" value="1.00">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block">Defensive Strength</label>
+                                        <input type="number" id="hDef" step="0.05" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white" value="1.00">
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="text-[11px] font-semibold text-purple-400 block border-b border-slate-800 pb-1">Away Team Base</span>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block">Attacking Strength</label>
+                                        <input type="number" id="aAtt" step="0.05" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white" value="1.00">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block">Defensive Strength</label>
+                                        <input type="number" id="aDef" step="0.05" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white" value="1.00">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Context Modifiers -->
+                            <div class="space-y-3 bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                                <span class="text-[11px] font-semibold text-amber-400 block border-b border-slate-800 pb-1">Match Context & Environmental Factors</span>
+                                
+                                <div>
+                                    <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                        <span>Home Advantage xG Boost</span>
+                                        <span id="hAdvVal" class="text-blue-400 font-bold">1.25x</span>
+                                    </div>
+                                    <input type="range" id="hAdv" min="1.0" max="1.5" step="0.02" value="1.25" oninput="document.getElementById('hAdvVal').textContent=this.value+'x'" class="w-full accent-blue-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block mb-1">Home Recent Form</label>
+                                        <select id="hForm" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200">
+                                            <option value="1.15">🔥 Excellent (4-5 Wins)</option>
+                                            <option value="1.05">📈 Good (Above avg)</option>
+                                            <option value="1.00" selected>➡️ Average</option>
+                                            <option value="0.92">📉 Poor (1 Win / Losses)</option>
+                                            <option value="0.85">🥶 Terrible Form</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block mb-1">Away Recent Form</label>
+                                        <select id="aForm" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200">
+                                            <option value="1.15">🔥 Excellent (4-5 Wins)</option>
+                                            <option value="1.05">📈 Good (Above avg)</option>
+                                            <option value="1.00" selected>➡️ Average</option>
+                                            <option value="0.92">📉 Poor (1 Win / Losses)</option>
+                                            <option value="0.85">🥶 Terrible Form</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block mb-1">Home Rest / Fatigue</label>
+                                        <select id="hRest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200">
+                                            <option value="1.03"> Rested (6+ Days)</option>
+                                            <option value="1.00" selected>⚡ Normal (3-5 Days)</option>
+                                            <option value="0.93"> Fatigue (Midweek Match)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block mb-1">Away Rest / Fatigue</label>
+                                        <select id="aRest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200">
+                                            <option value="1.03"> Rested (6+ Days)</option>
+                                            <option value="1.00" selected>⚡ Normal (3-5 Days)</option>
+                                            <option value="0.93"> Fatigue (Midweek Match)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                        <span>Dixon-Coles Correlation Rate (<span class="font-mono">ρ</span>)</span>
+                                        <span id="rhoVal" class="text-indigo-400 font-bold">-0.13</span>
+                                    </div>
+                                    <input type="range" id="rho" min="-0.30" max="0.00" step="0.01" value="-0.13" oninput="document.getElementById('rhoVal').textContent=this.value" class="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Calculate Button -->
+                    <button onclick="calculatePrediction()" class="w-full mt-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/25 transition-all transform active:scale-[0.99] flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Generate Match Analytics</span>
+                    </button>
+                </div>
+
+                <!-- Bookmaker Odds Input for EV Finder -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <h2 class="text-base font-semibold text-slate-200 mb-3 flex items-center justify-between">
+                        <span class="flex items-center"><i class="fa-solid fa-calculator text-amber-400 mr-2"></i> Bookie Odds & EV Detector</span>
+                        <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">+EV Finder</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mb-4">Enter Decimal odds offered by your bookmaker to detect value edges and Kelly stake recommendations.</p>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[11px] font-medium text-slate-400 block mb-1 text-center">Home Odds (1)</label>
+                            <input type="number" id="oddHome" step="0.01" placeholder="e.g. 2.10" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center focus:border-amber-500 focus:outline-none" oninput="calculateEV()">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-medium text-slate-400 block mb-1 text-center">Draw Odds (X)</label>
+                            <input type="number" id="oddDraw" step="0.01" placeholder="e.g. 3.40" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center focus:border-amber-500 focus:outline-none" oninput="calculateEV()">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-medium text-slate-400 block mb-1 text-center">Away Odds (2)</label>
+                            <input type="number" id="oddAway" step="0.01" placeholder="e.g. 3.60" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center focus:border-amber-500 focus:outline-none" oninput="calculateEV()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Analytics Results -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Header Match Banner -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 opacity-5 pointer-events-none text-9xl font-black text-white">
+                        VS
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center">
+                            <i class="fa-solid fa-trophy text-amber-500 mr-1.5"></i> Expected Goals (xG) Breakdown
+                        </span>
+                        <span id="leagueBadge" class="text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
+                            Premier League
+                        </span>
+                    </div>
+
+                    <!-- Teams & Expected Goals -->
+                    <div class="grid grid-cols-7 items-center text-center">
+                        <div class="col-span-3 space-y-1">
+                            <h3 id="displayHomeName" class="font-bold text-lg text-white truncate">Home Team</h3>
+                            <div class="text-3xl font-black text-blue-400" id="displayHomeXG">0.00</div>
+                            <span class="text-[10px] text-slate-500 uppercase tracking-wider block">Expected Goals</span>
+                        </div>
+                        <div class="col-span-1 flex flex-col items-center justify-center">
+                            <span class="text-xs font-bold text-slate-600">VS</span>
+                            <div class="w-px h-8 bg-slate-800 my-1"></div>
+                        </div>
+                        <div class="col-span-3 space-y-1">
+                            <h3 id="displayAwayName" class="font-bold text-lg text-white truncate">Away Team</h3>
+                            <div class="text-3xl font-black text-purple-400" id="displayAwayXG">0.00</div>
+                            <span class="text-[10px] text-slate-500 uppercase tracking-wider block">Expected Goals</span>
+                        </div>
+                    </div>
+
+                    <!-- Highlight Most Probable Scoreline -->
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                        <div class="text-xs text-slate-400">
+                            Most Likely Scoreline: <span id="mostLikelyScore" class="font-bold text-white text-sm ml-1">1 - 1</span>
+                        </div>
+                        <div class="text-xs text-slate-400">
+                            Total Projected Goals: <span id="totalXG" class="font-bold text-emerald-400 text-sm ml-1">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="flex border-b border-slate-800 space-x-4">
+                    <button id="tabBtn1" onclick="switchTab('markets')" class="pb-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400 transition-colors">
+                        <i class="fa-solid fa-chart-pie mr-1.5"></i> Betting Markets
+                    </button>
+                    <button id="tabBtn2" onclick="switchTab('matrix')" class="pb-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors">
+                        <i class="fa-solid fa-table-cells mr-1.5"></i> Score Matrix
+                    </button>
+                    <button id="tabBtn3" onclick="switchTab('ev')" class="pb-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors">
+                        <i class="fa-solid fa-coins mr-1.5"></i> +EV Edge Analysis
+                    </button>
+                </div>
+
+                <!-- TAB 1: BETTING MARKETS -->
+                <div id="tabMarkets" class="space-y-4">
+                    <!-- 1X2 Probabilities -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">1X2 Match Winner Odds</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 text-center">
+                                <span class="text-xs text-slate-400 block mb-1">Home Win (1)</span>
+                                <div id="probHome" class="text-xl font-bold text-blue-400">0.0%</div>
+                                <span id="fairOddsHome" class="text-[10px] text-slate-500 block mt-1">Fair: @0.00</span>
+                            </div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 text-center">
+                                <span class="text-xs text-slate-400 block mb-1">Draw (X)</span>
+                                <div id="probDraw" class="text-xl font-bold text-amber-400">0.0%</div>
+                                <span id="fairOddsDraw" class="text-[10px] text-slate-500 block mt-1">Fair: @0.00</span>
+                            </div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 text-center">
+                                <span class="text-xs text-slate-400 block mb-1">Away Win (2)</span>
+                                <div id="probAway" class="text-xl font-bold text-purple-400">0.0%</div>
+                                <span id="fairOddsAway" class="text-[10px] text-slate-500 block mt-1">Fair: @0.00</span>
+                            </div>
+                        </div>
+
+                        <!-- 1X2 Bar Visualizer -->
+                        <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden flex mt-4 border border-slate-800">
+                            <div id="barHome" class="bg-blue-500 h-full transition-all duration-500" style="width: 33%"></div>
+                            <div id="barDraw" class="bg-amber-500 h-full transition-all duration-500" style="width: 33%"></div>
+                            <div id="barAway" class="bg-purple-500 h-full transition-all duration-500" style="width: 34%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Markets Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Double Chance & DNB -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Double Chance & DNB</h3>
+                            
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">1X (Home or Draw)</span>
+                                    <span id="prob1X" class="font-bold text-emerald-400">0.0%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">12 (Home or Away)</span>
+                                    <span id="prob12" class="font-bold text-emerald-400">0.0%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">X2 (Draw or Away)</span>
+                                    <span id="probX2" class="font-bold text-emerald-400">0.0%</span>
+                                </div>
+                                <div class="border-t border-slate-800 pt-2 flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Draw No Bet (DNB 1)</span>
+                                    <span id="probDNB1" class="font-bold text-blue-400">0.0%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Draw No Bet (DNB 2)</span>
+                                    <span id="probDNB2" class="font-bold text-purple-400">0.0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Over / Under Goals & BTTS -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Goal Lines & BTTS</h3>
+                            
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Over 1.5 Goals</span>
+                                    <span id="probOver15" class="font-bold text-blue-400">0.0%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Over 2.5 Goals</span>
+                                    <span id="probOver25" class="font-bold text-blue-400">0.0%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Over 3.5 Goals</span>
+                                    <span id="probOver35" class="font-bold text-blue-400">0.0%</span>
+                                </div>
+                                <div class="border-t border-slate-800 pt-2 flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Both Teams To Score (YES)</span>
+                                    <span id="probBTTSYes" class="font-bold text-amber-400">0.0%</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-300">Both Teams To Score (NO)</span>
+                                    <span id="probBTTSNo" class="font-bold text-slate-400">0.0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top 6 Exact Scorelines -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Top 6 Most Likely Exact Scores</h3>
+                        <div id="topScoresGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: EXACT SCORE MATRIX -->
+                <div id="tabMatrix" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Dixon-Coles Adjusted Score Probability Matrix</h3>
+                    <p class="text-xs text-slate-400 mb-4">Values represent exact match probabilities (%), adjusted for low-score correlation dependence.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-center text-xs border-collapse">
+                            <thead>
+                                <tr class="text-slate-400 border-b border-slate-800">
+                                    <th class="p-2 border-r border-slate-800 font-normal">H \ A</th>
+                                    <th class="p-2 font-semibold">0</th>
+                                    <th class="p-2 font-semibold">1</th>
+                                    <th class="p-2 font-semibold">2</th>
+                                    <th class="p-2 font-semibold">3</th>
+                                    <th class="p-2 font-semibold">4</th>
+                                    <th class="p-2 font-semibold">5+</th>
+                                </tr>
+                            </thead>
+                            <tbody id="matrixTbody" class="divide-y divide-slate-800/50">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB 3: EV FINDER & VALUE EDGE -->
+                <div id="tabEV" class="hidden space-y-4">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">1X2 Value & Expected Value (+EV) Calculation</h3>
+                        <p class="text-xs text-slate-400 mb-4">Expected Value (EV) = (Probability × Odds) - 1. Positive values indicate a mathematical edge over bookmakers.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Home EV -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                                <span class="text-xs font-bold text-blue-400 block">Home Win (1) Value</span>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Model Probability:</span>
+                                    <span id="evHomeProb" class="font-semibold text-white">0%</span>
+                                </div>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Expected Value:</span>
+                                    <span id="evHomeEV" class="font-bold text-slate-400">N/A</span>
+                                </div>
+                                <div class="flex justify-between text-xs border-t border-slate-800 pt-2">
+                                    <span class="text-slate-400">Kelly Rec. Stake:</span>
+                                    <span id="evHomeKelly" class="font-bold text-slate-400">0%</span>
+                                </div>
+                            </div>
+
+                            <!-- Draw EV -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                                <span class="text-xs font-bold text-amber-400 block">Draw (X) Value</span>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Model Probability:</span>
+                                    <span id="evDrawProb" class="font-semibold text-white">0%</span>
+                                </div>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Expected Value:</span>
+                                    <span id="evDrawEV" class="font-bold text-slate-400">N/A</span>
+                                </div>
+                                <div class="flex justify-between text-xs border-t border-slate-800 pt-2">
+                                    <span class="text-slate-400">Kelly Rec. Stake:</span>
+                                    <span id="evDrawKelly" class="font-bold text-slate-400">0%</span>
+                                </div>
+                            </div>
+
+                            <!-- Away EV -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                                <span class="text-xs font-bold text-purple-400 block">Away Win (2) Value</span>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Model Probability:</span>
+                                    <span id="evAwayProb" class="font-semibold text-white">0%</span>
+                                </div>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Expected Value:</span>
+                                    <span id="evAwayEV" class="font-bold text-slate-400">N/A</span>
+                                </div>
+                                <div class="flex justify-between text-xs border-t border-slate-800 pt-2">
+                                    <span class="text-slate-400">Kelly Rec. Stake:</span>
+                                    <span id="evAwayKelly" class="font-bold text-slate-400">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary / Recommendation Box -->
+                        <div id="evRecommendation" class="mt-4 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 text-center">
+                            Enter bookmaker odds in the left panel to display value calculations.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            Dixon-Coles Poisson Soccer Prediction Engine &bull; Built with HTML5 & Tailwind CSS
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // League Averages (Base Expected Goals)
+        const LEAGUE_AVG = {
+            epl: { home: 1.48, away: 1.18 },
+            laliga: { home: 1.42, away: 1.08 },
+            seriea: { home: 1.40, away: 1.12 },
+            bundesliga: { home: 1.62, away: 1.30 },
+            ligue1: { home: 1.38, away: 1.10 },
+            custom: { home: 1.45, away: 1.20 }
+        };
+
+        // Comprehensive Teams Rating Dataset (Att & Def Strengths relative to 1.00 league avg)
+        const TEAMS = {
+            epl: {
+                "Arsenal": { att: 1.35, def: 0.55 },
+                "Manchester City": { att: 1.45, def: 0.65 },
+                "Liverpool": { att: 1.40, def: 0.60 },
+                "Chelsea": { att: 1.20, def: 0.85 },
+                "Aston Villa": { att: 1.15, def: 0.90 },
+                "Newcastle United": { att: 1.12, def: 0.88 },
+                "Tottenham": { att: 1.18, def: 1.05 },
+                "Brighton": { att: 1.10, def: 1.00 },
+                "Manchester United": { att: 1.00, def: 0.95 },
+                "Bournemouth": { att: 1.02, def: 1.08 },
+                "Brentford": { att: 1.00, def: 1.05 },
+                "Fulham": { att: 0.95, def: 0.95 },
+                "Nottingham Forest": { att: 0.92, def: 0.88 },
+                "West Ham": { att: 0.95, def: 1.15 },
+                "Everton": { att: 0.82, def: 0.90 },
+                "Crystal Palace": { att: 0.85, def: 0.92 },
+                "Wolverhampton": { att: 0.85, def: 1.20 },
+                "Ipswich Town": { att: 0.78, def: 1.25 },
+                "Leicester City": { att: 0.82, def: 1.30 },
+                "Southampton": { att: 0.70, def: 1.35 }
+            },
+            laliga: {
+                "Barcelona": { att: 1.55, def: 0.60 },
+                "Real Madrid": { att: 1.50, def: 0.55 },
+                "Atletico Madrid": { att: 1.22, def: 0.50 },
+                "Athletic Club": { att: 1.10, def: 0.70 },
+                "Villarreal": { att: 1.18, def: 1.05 },
+                "Real Sociedad": { att: 0.95, def: 0.75 },
+                "Real Betis": { att: 1.00, def: 0.85 },
+                "Girona": { att: 1.05, def: 1.10 },
+                "Osasuna": { att: 0.90, def: 0.95 },
+                "Celta Vigo": { att: 0.95, def: 1.12 },
+                "Sevilla": { att: 0.90, def: 1.00 },
+                "Rayo Vallecano": { att: 0.85, def: 0.90 },
+                "Mallorca": { att: 0.78, def: 0.80 },
+                "Alaves": { att: 0.80, def: 0.98 },
+                "Espanyol": { att: 0.75, def: 1.15 },
+                "Getafe": { att: 0.65, def: 0.80 },
+                "Las Palmas": { att: 0.75, def: 1.20 },
+                "Leganes": { att: 0.68, def: 1.05 },
+                "Valladolid": { att: 0.62, def: 1.30 },
+                "Valencia": { att: 0.70, def: 1.25 }
+            },
+            seriea: {
+                "Inter Milan": { att: 1.45, def: 0.55 },
+                "Atalanta": { att: 1.40, def: 0.80 },
+                "Napoli": { att: 1.25, def: 0.60 },
+                "Juventus": { att: 1.15, def: 0.48 },
+                "Lazio": { att: 1.20, def: 0.82 },
+                "AC Milan": { att: 1.25, def: 0.90 },
+                "Fiorentina": { att: 1.12, def: 0.85 },
+                "AS Roma": { att: 1.05, def: 0.92 },
+                "Bologna": { att: 1.00, def: 0.80 },
+                "Torino": { att: 0.82, def: 0.85 },
+                "Udinese": { att: 0.88, def: 1.05 },
+                "Empoli": { att: 0.70, def: 0.85 },
+                "Verona": { att: 0.82, def: 1.25 },
+                "Como": { att: 0.85, def: 1.15 },
+                "Cagliari": { att: 0.75, def: 1.15 },
+                "Parma": { att: 0.85, def: 1.20 },
+                "Lecce": { att: 0.62, def: 1.10 },
+                "Genoa": { att: 0.72, def: 1.10 },
+                "Monza": { att: 0.68, def: 1.08 },
+                "Venezia": { att: 0.70, def: 1.25 }
+            },
+            bundesliga: {
+                "Bayern Munich": { att: 1.65, def: 0.55 },
+                "Bayer Leverkusen": { att: 1.45, def: 0.80 },
+                "Eintracht Frankfurt": { att: 1.30, def: 1.05 },
+                "RB Leipzig": { att: 1.25, def: 0.70 },
+                "Borussia Dortmund": { att: 1.28, def: 0.95 },
+                "SC Freiburg": { att: 1.05, def: 0.90 },
+                "VfB Stuttgart": { att: 1.25, def: 1.00 },
+                "FSV Mainz 05": { att: 1.05, def: 0.95 },
+                "Werder Bremen": { att: 1.05, def: 1.10 },
+                "Borussia M'gladbach": { att: 1.05, def: 1.15 },
+                "FC Augsburg": { att: 0.95, def: 1.20 },
+                "VfL Wolfsburg": { att: 1.00, def: 1.10 },
+                "Union Berlin": { att: 0.78, def: 0.88 },
+                "FC St. Pauli": { att: 0.70, def: 0.95 },
+                "TSG Hoffenheim": { att: 1.00, def: 1.30 },
+                "FC Heidenheim": { att: 0.85, def: 1.15 },
+                "VfL Bochum": { att: 0.70, def: 1.45 },
+                "Holstein Kiel": { att: 0.75, def: 1.40 }
+            },
+            ligue1: {
+                "Paris Saint-Germain": { att: 1.55, def: 0.55 },
+                "AS Monaco": { att: 1.28, def: 0.75 },
+                "Marseille": { att: 1.30, def: 0.85 },
+                "Lille": { att: 1.15, def: 0.68 },
+                "Lyon": { att: 1.20, def: 0.95 },
+                "Lens": { att: 1.00, def: 0.70 },
+                "OGC Nice": { att: 1.10, def: 0.72 },
+                "Stade Reims": { att: 0.95, def: 0.90 },
+                "Auxerre": { att: 0.95, def: 1.10 },
+                "Toulouse": { att: 0.88, def: 0.90 },
+                "Strasbourg": { att: 1.00, def: 1.15 },
+                "Brest": { att: 0.98, def: 1.05 },
+                "Rennes": { att: 0.95, def: 1.05 },
+                "Nantes": { att: 0.78, def: 0.95 },
+                "Angers": { att: 0.72, def: 1.05 },
+                "Le Havre": { att: 0.68, def: 1.08 },
+                "Saint-Etienne": { att: 0.70, def: 1.30 },
+                "Montpellier": { att: 0.75, def: 1.40 }
+            }
+        };
+
+        // State Store
+        let currentResults = null;
+
+        // Initialize App
+        window.onload = function() {
+            onLeagueChange();
+            calculatePrediction();
+        };
+
+        function toggleAdvancedSettings() {
+            const adv = document.getElementById('advancedSettings');
+            const chev = document.getElementById('advChevron');
+            if (adv.classList.contains('hidden')) {
+                adv.classList.remove('hidden');
+                chev.classList.add('rotate-180');
+            } else {
+                adv.classList.add('hidden');
+                chev.classList.remove('rotate-180');
+            }
+        }
+
+        function onLeagueChange() {
+            const leagueKey = document.getElementById('leagueSelect').value;
+            const homeSel = document.getElementById('homeSelect');
+            const awaySel = document.getElementById('awaySelect');
+            const badge = document.getElementById('leagueBadge');
+
+            homeSel.innerHTML = '';
+            awaySel.innerHTML = '';
+
+            const leagueNames = {
+                epl: "Premier League",
+                laliga: "La Liga",
+                seriea: "Serie A",
+                bundesliga: "Bundesliga",
+                ligue1: "Ligue 1",
+                custom: "Custom Teams"
+            };
+            badge.textContent = leagueNames[leagueKey] || "Custom";
+
+            if (leagueKey === 'custom') {
+                homeSel.innerHTML = '<option value="Custom Home">Custom Home Team</option>';
+                awaySel.innerHTML = '<option value="Custom Away">Custom Away Team</option>';
+                document.getElementById('hAtt').value = "1.10";
+                document.getElementById('hDef').value = "0.90";
+                document.getElementById('aAtt').value = "1.00";
+                document.getElementById('aDef').value = "1.05";
+                calculatePrediction();
+                return;
+            }
+
+            const teamList = Object.keys(TEAMS[leagueKey]).sort();
+            teamList.forEach(t => {
+                homeSel.innerHTML += `<option value="${t}">${t}</option>`;
+                awaySel.innerHTML += `<option value="${t}">${t}</option>`;
+            });
+
+            // Set default rivalries / matches
+            if (teamList.length >= 2) {
+                homeSel.selectedIndex = 0;
+                awaySel.selectedIndex = 1;
+            }
+
+            onTeamChange();
+        }
+
+        function onTeamChange() {
+            const leagueKey = document.getElementById('leagueSelect').value;
+            if (leagueKey === 'custom') return;
+
+            const homeName = document.getElementById('homeSelect').value;
+            const awayName = document.getElementById('awaySelect').value;
+
+            const ht = TEAMS[leagueKey][homeName];
+            const at = TEAMS[leagueKey][awayName];
+
+            if (ht) {
+                document.getElementById('hAtt').value = ht.att.toFixed(2);
+                document.getElementById('hDef').value = ht.def.toFixed(2);
+            }
+            if (at) {
+                document.getElementById('aAtt').value = at.att.toFixed(2);
+                document.getElementById('aDef').value = at.def.toFixed(2);
+            }
+
+            calculatePrediction();
+        }
+
+        // Mathematical Helpers
+        function factorial(n) {
+            if (n <= 1) return 1;
+            let res = 1;
+            for (let i = 2; i <= n; i++) res *= i;
+            return res;
+        }
+
+        function poisson(k, lambda) {
+            return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+        }
+
+        // Dixon-Coles Tau Correction Factor for Low Scorelines
+        function getDixonColesTau(x, y, lambda, mu, rho) {
+            if (x === 0 && y === 0) {
+                return 1 - (lambda * mu * rho);
+            } else if (x === 1 && y === 0) {
+                return 1 + (mu * rho);
+            } else if (x === 0 && y === 1) {
+                return 1 + (lambda * rho);
+            } else if (x === 1 && y === 1) {
+                return 1 - rho;
+            }
+            return 1.0;
+        }
+
+        // Core Prediction Engine
+        function calculatePrediction() {
+            const leagueKey = document.getElementById('leagueSelect').value;
+            const homeName = document.getElementById('homeSelect').value;
+            const awayName = document.getElementById('awaySelect').value;
+
+            document.getElementById('displayHomeName').textContent = homeName;
+            document.getElementById('displayAwayName').textContent = awayName;
+
+            // Fetch Strengths & Modifiers
+            const hAtt = parseFloat(document.getElementById('hAtt').value) || 1.0;
+            const hDef = parseFloat(document.getElementById('hDef').value) || 1.0;
+            const aAtt = parseFloat(document.getElementById('aAtt').value) || 1.0;
+            const aDef = parseFloat(document.getElementById('aDef').value) || 1.0;
+
+            const hAdv = parseFloat(document.getElementById('hAdv').value) || 1.25;
+            const hForm = parseFloat(document.getElementById('hForm').value) || 1.0;
+            const aForm = parseFloat(document.getElementById('aForm').value) || 1.0;
+            const hRest = parseFloat(document.getElementById('hRest').value) || 1.0;
+            const aRest = parseFloat(document.getElementById('aRest').value) || 1.0;
+            const rho = parseFloat(document.getElementById('rho').value) || -0.13;
+
+            const baseAvg = LEAGUE_AVG[leagueKey] || LEAGUE_AVG.custom;
+
+            // Calculate Expected Goals (lambda & mu)
+            const lambdaHome = baseAvg.home * hAtt * aDef * hAdv * hForm * hRest;
+            const lambdaAway = baseAvg.away * aAtt * hDef * aForm * aRest;
+
+            document.getElementById('displayHomeXG').textContent = lambdaHome.toFixed(2);
+            document.getElementById('displayAwayXG').textContent = lambdaAway.toFixed(2);
+            document.getElementById('totalXG').textContent = (lambdaHome + lambdaAway).toFixed(2);
+
+            // Matrix generation (0 to 6 goals)
+            const MAX_GOALS = 6;
+            let matrix = [];
+            let pHome = 0, pDraw = 0, pAway = 0;
+            let over15 = 0, over25 = 0, over35 = 0;
+            let bttsYes = 0;
+            let scoresList = [];
+            let totalProbSum = 0;
+
+            for (let i = 0; i <= MAX_GOALS; i++) {
+                matrix[i] = [];
+                for (let j = 0; j <= MAX_GOALS; j++) {
+                    const rawP = poisson(i, lambdaHome) * poisson(j, lambdaAway);
+                    const tau = getDixonColesTau(i, j, lambdaHome, lambdaAway, rho);
+                    const finalP = Math.max(0, rawP * tau);
+
+                    matrix[i][j] = finalP;
+                    totalProbSum += finalP;
+                }
+            }
+
+            // Normalize matrix so probabilities sum up exactly to 1.0 (100%)
+            for (let i = 0; i <= MAX_GOALS; i++) {
+                for (let j = 0; j <= MAX_GOALS; j++) {
+                    matrix[i][j] /= totalProbSum;
+                    const p = matrix[i][j];
+
+                    scoresList.push({ home: i, away: j, p });
+
+                    if (i > j) pHome += p;
+                    else if (i === j) pDraw += p;
+                    else pAway += p;
+
+                    const totalG = i + j;
+                    if (totalG > 1.5) over15 += p;
+                    if (totalG > 2.5) over25 += p;
+                    if (totalG > 3.5) over35 += p;
+
+                    if (i > 0 && j > 0) bttsYes += p;
+                }
+            }
+
+            // Store Results Globally
+            currentResults = {
+                pHome, pDraw, pAway,
+                over15, over25, over35,
+                bttsYes, bttsNo: 1 - bttsYes,
+                matrix, scoresList,
+                lambdaHome, lambdaAway
+            };
+
+            // Render UI Components
+            renderMarkets();
+            renderMatrix();
+            calculateEV();
+        }
+
+        function renderMarkets() {
+            const { pHome, pDraw, pAway, over15, over25, over35, bttsYes, bttsNo, scoresList } = currentResults;
+
+            // 1X2 Probabilities & Fair Odds
+            document.getElementById('probHome').textContent = (pHome * 100).toFixed(1) + '%';
+            document.getElementById('probDraw').textContent = (pDraw * 100).toFixed(1) + '%';
+            document.getElementById('probAway').textContent = (pAway * 100).toFixed(1) + '%';
+
+            document.getElementById('fairOddsHome').textContent = `Fair: @${(1 / pHome).toFixed(2)}`;
+            document.getElementById('fairOddsDraw').textContent = `Fair: @${(1 / pDraw).toFixed(2)}`;
+            document.getElementById('fairOddsAway').textContent = `Fair: @${(1 / pAway).toFixed(2)}`;
+
+            // Visual Bar
+            document.getElementById('barHome').style.width = `${pHome * 100}%`;
+            document.getElementById('barDraw').style.width = `${pDraw * 100}%`;
+            document.getElementById('barAway').style.width = `${pAway * 100}%`;
+
+            // Double Chance & DNB
+            const prob1X = pHome + pDraw;
+            const prob12 = pHome + pAway;
+            const probX2 = pDraw + pAway;
+            const dnb1 = pHome / (pHome + pAway);
+            const dnb2 = pAway / (pHome + pAway);
+
+            document.getElementById('prob1X').textContent = (prob1X * 100).toFixed(1) + '%';
+            document.getElementById('prob12').textContent = (prob12 * 100).toFixed(1) + '%';
+            document.getElementById('probX2').textContent = (probX2 * 100).toFixed(1) + '%';
+            document.getElementById('probDNB1').textContent = (dnb1 * 100).toFixed(1) + '%';
+            document.getElementById('probDNB2').textContent = (dnb2 * 100).toFixed(1) + '%';
+
+            // Goal Lines & BTTS
+            document.getElementById('probOver15').textContent = (over15 * 100).toFixed(1) + '%';
+            document.getElementById('probOver25').textContent = (over25 * 100).toFixed(1) + '%';
+            document.getElementById('probOver35').textContent = (over35 * 100).toFixed(1) + '%';
+            document.getElementById('probBTTSYes').textContent = (bttsYes * 100).toFixed(1) + '%';
+            document.getElementById('probBTTSNo').textContent = (bttsNo * 100).toFixed(1) + '%';
+
+            // Top Scorelines
+            scoresList.sort((a, b) => b.p - a.p);
+            document.getElementById('mostLikelyScore').textContent = `${scoresList[0].home} - ${scoresList[0].away}`;
+
+            const topGrid = document.getElementById('topScoresGrid');
+            topGrid.innerHTML = '';
+            scoresList.slice(0, 6).forEach((item, index) => {
+                topGrid.innerHTML += `
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                        <span class="font-bold text-sm text-slate-200">${item.home} - ${item.away}</span>
+                        <span class="text-xs font-semibold ${index === 0 ? 'text-emerald-400' : 'text-slate-400'}">${(item.p * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+            });
+        }
+
+        function renderMatrix() {
+            const matrix = currentResults.matrix;
+            const tbody = document.getElementById('matrixTbody');
+            tbody.innerHTML = '';
+
+            for (let i = 0; i <= 5; i++) {
+                let rowHTML = `<tr class="hover:bg-slate-850/50 transition-colors">`;
+                rowHTML += `<td class="p-2 font-semibold text-slate-400 border-r border-slate-800">${i}</td>`;
+                
+                for (let j = 0; j <= 5; j++) {
+                    const probVal = (matrix[i][j] * 100).toFixed(1);
+                    let bgIntensity = "bg-slate-950/40";
+                    if (matrix[i][j] > 0.09) bgIntensity = "bg-blue-600/30 text-blue-300 font-bold border border-blue-500/30";
+                    else if (matrix[i][j] > 0.05) bgIntensity = "bg-indigo-600/20 text-indigo-300";
+                    
+                    rowHTML += `<td class="p-2.5 ${bgIntensity} rounded-md m-0.5">${probVal}%</td>`;
+                }
+                rowHTML += `</tr>`;
+                tbody.innerHTML += rowHTML;
+            }
+        }
+
+        // Expected Value (+EV) Calculation & Kelly Stake
+        function calculateEV() {
+            if (!currentResults) return;
+
+            const { pHome, pDraw, pAway } = currentResults;
+            const oH = parseFloat(document.getElementById('oddHome').value);
+            const oD = parseFloat(document.getElementById('oddDraw').value);
+            const oA = parseFloat(document.getElementById('oddAway').value);
+
+            document.getElementById('evHomeProb').textContent = (pHome * 100).toFixed(1) + '%';
+            document.getElementById('evDrawProb').textContent = (pDraw * 100).toFixed(1) + '%';
+            document.getElementById('evAwayProb').textContent = (pAway * 100).toFixed(1) + '%';
+
+            let bestEV = -999;
+            let bestBet = "";
+
+            // Helper to compute EV & Kelly Criterion
+            function processEV(prob, odds, evElemId, kellyElemId, label) {
+                const elemEV = document.getElementById(evElemId);
+                const elemKelly = document.getElementById(kellyElemId);
+
+                if (!odds || odds <= 1.0) {
+                    elemEV.textContent = 'N/A';
+                    elemEV.className = 'font-bold text-slate-400';
+                    elemKelly.textContent = '0%';
+                    return;
+                }
+
+                const ev = (prob * odds) - 1;
+                const evPct = (ev * 100).toFixed(1);
+                
+                // Fractional Kelly (Quarter Kelly = 0.25 for bankroll management)
+                const b = odds - 1;
+                const q = 1 - prob;
+                const kelly = Math.max(0, ((b * prob - q) / b) * 0.25);
+                const kellyPct = (kelly * 100).toFixed(1);
+
+                elemKelly.textContent = `${kellyPct}%`;
+
+                if (ev > 0) {
+                    elemEV.textContent = `+${evPct}% (+EV)`;
+                    elemEV.className = 'font-bold text-emerald-400';
+                    if (ev > bestEV) {
+                        bestEV = ev;
+                        bestBet = `${label} @${odds.toFixed(2)} (+${evPct}% EV, Stake: ${kellyPct}% bankroll)`;
+                    }
+                } else {
+                    elemEV.textContent = `${evPct}%`;
+                    elemEV.className = 'font-bold text-rose-400';
+                }
+            }
+
+            processEV(pHome, oH, 'evHomeEV', 'evHomeKelly', 'Home Win (1)');
+            processEV(pDraw, oD, 'evDrawEV', 'evDrawKelly', 'Draw (X)');
+            processEV(pAway, oA, 'evAwayEV', 'evAwayKelly', 'Away Win (2)');
+
+            const recBox = document.getElementById('evRecommendation');
+            if (bestEV > 0) {
+                recBox.className = "mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300 text-center font-medium";
+                recBox.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> <strong>Value Detected!</strong> Recommended Bet: <u>${bestBet}</u>`;
+            } else if (oH || oD || oA) {
+                recBox.className = "mt-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 text-center font-medium";
+                recBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> No positive value (+EV) bets found for current bookmaker odds.`;
+            } else {
+                recBox.className = "mt-4 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 text-center";
+                recBox.textContent = "Enter bookmaker odds in the left panel to display value calculations.";
+            }
+        }
+
+        // Tab Switcher
+        function switchTab(tab) {
+            document.getElementById('tabMarkets').classList.add('hidden');
+            document.getElementById('tabMatrix').classList.add('hidden');
+            document.getElementById('tabEV').classList.add('hidden');
+
+            document.getElementById('tabBtn1').className = "pb-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors";
+            document.getElementById('tabBtn2').className = "pb-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors";
+            document.getElementById('tabBtn3').className = "pb-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors";
+
+            if (tab === 'markets') {
+                document.getElementById('tabMarkets').classList.remove('hidden');
+                document.getElementById('tabBtn1').className = "pb-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400 transition-colors";
+            } else if (tab === 'matrix') {
+                document.getElementById('tabMatrix').classList.remove('hidden');
+                document.getElementById('tabBtn2').className = "pb-3 text-sm font-medium border-b-2 border-blue-500 text-blue-400 transition-colors";
+            } else if (tab === 'ev') {
+                document.getElementById('tabEV').classList.remove('hidden');
+                document.getElementById('tabBtn3').className = "pb-3 text-sm font-medium border-b-2 border-amber-500 text-amber-400 transition-colors";
+            }
+        }
+    </script>
+</body>
+</html>
